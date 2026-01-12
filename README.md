@@ -48,8 +48,7 @@ A comprehensive, full-stack quiz management platform with AI-generated questions
 
 - **Python 3.8+** - [Download](https://www.python.org/downloads/)
 - **Node.js 16+** - [Download](https://nodejs.org/)
-- **MongoDB** - [Download MongoDB Compass](https://www.mongodb.com/products/compass)
-- **OpenAI API Key** - [Get your key](https://platform.openai.com/api-keys) (optional for hardcoded questions)
+- **AI API Key** - OpenAI, Gemini, or Groq (optional for hardcoded questions)
 
 ### ⚡ 3-Minute Setup
 
@@ -102,15 +101,19 @@ npm run dev
 
 **Frontend runs at:** `http://localhost:5173`
 
-#### 4️⃣ Configure OpenAI (Optional)
-
+#### 4️⃣ Configure AI Provider (Optional)
+    
 **For AI-Generated Questions:**
-
+    
 Edit `backend/.env`:
+   
 ```env
-OPENAI_API_KEY=your-actual-openai-api-key-here
+# Choose one or more:
+OPENAI_API_KEY=your-key
+GEMINI_API_KEY=your-key
+GROQ_API_KEY=your-key
 ```
-
+    
 **For Hardcoded Questions:**
 - No configuration needed! The system includes 150 pre-loaded questions
 - Perfect for testing and offline usage
@@ -198,9 +201,9 @@ Quiz-Management-System/
 ### Backend
 - **Framework:** Django 4.2.7
 - **API:** Django REST Framework 3.14.0
-- **Database:** MongoDB (via Djongo)
+- **Database:** SQLite (Default)
 - **Authentication:** Token-based auth
-- **AI:** OpenAI GPT-3.5 Turbo
+- **AI:** OpenAI GPT-3.5, Google Gemini, Groq Llama 3
 
 ### Frontend
 - **Framework:** React 18
@@ -398,11 +401,10 @@ taskkill /PID <PID> /F
 lsof -ti:8000 | xargs kill -9
 ```
 
-**MongoDB connection error:**
+**Database connection error:**
 ```bash
-# Ensure MongoDB is running
-# Check connection string in .env
-MONGODB_URI=mongodb://localhost:27017/quiz_management_db
+# Ensure migrations are applied
+python manage.py migrate
 ```
 
 **OpenAI API errors:**
@@ -449,7 +451,7 @@ git push heroku main
 
 **Option 2: DigitalOcean/AWS**
 - Set up Ubuntu server
-- Install Python, MongoDB
+- Install Python
 - Use Gunicorn + Nginx
 - Configure environment variables
 
@@ -475,8 +477,9 @@ netlify deploy --prod --dir=dist
 DEBUG=False
 ALLOWED_HOSTS=your-domain.com
 OPENAI_API_KEY=your-production-key
+GEMINI_API_KEY=your-production-key
+GROQ_API_KEY=your-production-key
 SECRET_KEY=your-strong-secret-key
-MONGODB_URI=your-production-mongodb-uri
 ```
 
 ---
