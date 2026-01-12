@@ -480,7 +480,9 @@ export const quizAPI = {
     if (!response.ok) {
       const error = await response.json();
       console.error('File upload error:', error);
-      throw new Error(error.error || 'Failed to generate quiz from file');
+      const errorMessage = error.error || 'Failed to generate quiz from file';
+      const detailedMessage = error.details ? `${errorMessage}: ${error.details}` : errorMessage;
+      throw new Error(detailedMessage);
     }
     return response.json();
   }

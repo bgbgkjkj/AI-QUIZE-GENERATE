@@ -16,7 +16,7 @@ import {
   AlertCircle,
   UploadCloud // Added for FileUploadQuizPage functionality
 } from 'lucide-react';
-import { quizAPI } from '../services/api';
+import { quizAPI, categoryAPI } from '../services/api';
 import { useDropzone } from 'react-dropzone'; // Added for FileUploadQuizPage functionality
 
 interface CreateQuizPageProps {
@@ -59,7 +59,7 @@ export function CreateQuizPage({ onBack, onNavigateToTakeQuiz }: CreateQuizPageP
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const data = await quizAPI.getQuizMetadata();
+        const data = await categoryAPI.getQuizMetadata();
         setCategories(data);
       } catch (error) {
         console.error("Failed to fetch quiz metadata", error);
@@ -384,7 +384,7 @@ export function CreateQuizPage({ onBack, onNavigateToTakeQuiz }: CreateQuizPageP
                     value={quizTitle}
                     onChange={(e) => setQuizTitle(e.target.value)}
                     placeholder="Enter a title for your quiz"
-                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all"
+                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all text-[#003B73] dark:text-blue-100 placeholder:text-[#003B73]/50 dark:placeholder:text-blue-100/50"
                   />
                 </div>
 
@@ -394,11 +394,11 @@ export function CreateQuizPage({ onBack, onNavigateToTakeQuiz }: CreateQuizPageP
                   <select
                     value={selectedCategory}
                     onChange={(e) => handleCategoryChange(e.target.value)}
-                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all"
+                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all text-[#003B73] dark:text-blue-100"
                   >
                     <option value="">Select a Category</option>
                     {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      <option key={cat.id} value={cat.id} className="bg-white dark:bg-slate-900 text-[#003B73] dark:text-blue-100">{cat.name}</option>
                     ))}
                   </select>
                 </div>
@@ -410,11 +410,11 @@ export function CreateQuizPage({ onBack, onNavigateToTakeQuiz }: CreateQuizPageP
                     value={selectedLevel}
                     onChange={(e) => handleLevelChange(e.target.value)}
                     disabled={!selectedCategory || levels.length === 0}
-                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all disabled:opacity-50"
+                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all disabled:opacity-50 text-[#003B73] dark:text-blue-100"
                   >
                     <option value="">Select a Level</option>
                     {levels.map((lvl) => (
-                      <option key={lvl.id} value={lvl.id}>{lvl.name}</option>
+                      <option key={lvl.id} value={lvl.id} className="bg-white dark:bg-slate-900 text-[#003B73] dark:text-blue-100">{lvl.name}</option>
                     ))}
                   </select>
                 </div>
@@ -426,11 +426,11 @@ export function CreateQuizPage({ onBack, onNavigateToTakeQuiz }: CreateQuizPageP
                     value={selectedSubject}
                     onChange={(e) => setSelectedSubject(e.target.value)}
                     disabled={!selectedLevel || subjects.length === 0}
-                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all disabled:opacity-50"
+                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all disabled:opacity-50 text-[#003B73] dark:text-blue-100"
                   >
                     <option value="">Select a Subject</option>
                     {subjects.map((sub) => (
-                      <option key={sub.id} value={sub.id}>{sub.name}</option>
+                      <option key={sub.id} value={sub.id} className="bg-white dark:bg-slate-900 text-[#003B73] dark:text-blue-100">{sub.name}</option>
                     ))}
                   </select>
                 </div>
@@ -452,7 +452,7 @@ export function CreateQuizPage({ onBack, onNavigateToTakeQuiz }: CreateQuizPageP
                       }
                     }}
                     placeholder="Enter number of questions"
-                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all"
+                    className="w-full px-4 py-3.5 bg-gradient-to-r from-[#DFF4FF]/50 to-white dark:from-slate-800 dark:to-slate-900 border border-[#003B73]/10 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#003B73]/20 focus:border-[#003B73]/30 transition-all text-[#003B73] dark:text-blue-100 placeholder:text-[#003B73]/50 dark:placeholder:text-blue-100/50"
                   />
                   <p className="text-[#003B73] dark:text-blue-100/60 mt-2">Enter a number between 1 and 100</p>
                 </div>
@@ -467,7 +467,7 @@ export function CreateQuizPage({ onBack, onNavigateToTakeQuiz }: CreateQuizPageP
                         onClick={() => setDifficulty(level)}
                         className={`py-3 rounded-2xl transition-all ${difficulty === level
                           ? 'bg-gradient-to-r from-[#003B73] to-[#0056A8] text-white shadow-lg'
-                          : 'bg-white border-2 border-[#003B73]/20 text-[#003B73] dark:text-blue-100 hover:border-[#003B73]/40'
+                          : 'bg-white dark:bg-slate-800 border-2 border-[#003B73]/20 dark:border-white/20 text-[#003B73] dark:text-blue-100 hover:border-[#003B73]/40'
                           }`}
                       >
                         {level.charAt(0).toUpperCase() + level.slice(1)}
@@ -585,7 +585,7 @@ export function CreateQuizPage({ onBack, onNavigateToTakeQuiz }: CreateQuizPageP
               </p>
 
               {/* Quiz Summary */}
-              <div className="bg-gradient-to-r from-[#DFF4FF]/30 to-white rounded-2xl p-6 mb-8 text-left max-w-md mx-auto">
+              <div className="bg-gradient-to-r from-[#DFF4FF]/30 to-white dark:from-slate-800 dark:to-slate-900 rounded-2xl p-6 mb-8 text-left max-w-md mx-auto">
                 <h3 className="text-[#003B73] dark:text-blue-100 mb-4">Quiz Summary</h3>
                 <div className="space-y-3">
                   <div className="flex justify-between">

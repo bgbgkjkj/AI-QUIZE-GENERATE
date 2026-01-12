@@ -73,7 +73,10 @@ def generate_ai_response(prompt, max_tokens=2000):
             except Exception as e:
                 print(f"Groq generation failed: {e}")
                 # Re-raise to see the actual error instead of falling back to invalid OpenAI
-                raise ValueError(f"Groq API Error: {e}")
+            except Exception as e:
+                print(f"Groq generation failed: {e}. Falling back to other providers...")
+                # Continue execution to try Gemini
+                pass
 
         gemini_key = getattr(settings, 'GEMINI_API_KEY', None)
         
@@ -86,24 +89,39 @@ def generate_ai_response(prompt, max_tokens=2000):
                 response = model.generate_content(prompt)
                 return response.text
             except Exception as e:
-                print(f"Gemini generation failed, falling back to OpenAI if available. Error: {e}")
+                print(f"Gemini generation failed: {e}. Falling back to Local LLM...")
+                pass
         
-        # Fallback to OpenAI
-        # Fallback to OpenAI REMOVED
-        # client = get_openai_client()
-        # response = client.chat.completions.create(
-        #     model="gpt-3.5-turbo",
-        #     messages=[
-        #         {"role": "system", "content": "You are an expert quiz generator. You generate unique and diverse questions every time."},
-        #         {"role": "user", "content": prompt}
-        #     ],
-        #     temperature=1.0,
-        #     presence_penalty=0.5,
-        #     frequency_penalty=0.5,
-        #     max_tokens=max_tokens
-        # )
-        # return response.choices[0].message.content.strip()
-        raise ValueError("No valid AI provider available. Please check GROQ_API_KEY.")
+        # 3. Fallback to Local LLM (Ollama)
+        # This allows UNLIMITED free generation if the user has Ollama installed
+        try:
+            print("DEBUG: Attempting to use Local LLM (Ollama)...")
+            import requests
+            
+            # Ollama API endpoint (standard port 11434)
+            # using 'llama3' as default, but falling back to 'mistral' or others is possible if we check functionality
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json={
+                    "model": "llama3", 
+                    "prompt": f"System: You are an expert quiz generator. Return valid JSON only.\nUser: {prompt}",
+                    "stream": False,
+                    "format": "json" # Force JSON mode if model supports it
+                },
+                timeout=300 # Increase timeout to 5 mins for slow PCs
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result.get("response", "")
+            else:
+                print(f"Ollama Error: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            print(f"Local LLM (Ollama) failed: {e}")
+            pass
+
+        raise ValueError("No valid AI provider available. Please check GROQ_API_KEY, GEMINI_API_KEY, or ensure Ollama is running.")
     except Exception as e:
         print(f"CRITICAL ERROR in generate_ai_response: {e}")
         traceback.print_exc()
@@ -1029,6 +1047,30 @@ class QuizGenerateFromFileView(APIView):
         if not file:
             return Response({'error': 'File is required'}, status=status.HTTP_400_BAD_REQUEST)
         
+        # Validate required metadata fields
+        if not category_id:
+            return Response({'error': 'Category is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not level_id:
+            return Response({'error': 'Level is required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not subject_id:
+            return Response({'error': 'Subject is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate that category, level, and subject exist
+        try:
+            category = Category.objects.get(pk=category_id)
+        except Category.DoesNotExist:
+            return Response({'error': f'Category with ID {category_id} not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            level = Level.objects.get(pk=level_id)
+        except Level.DoesNotExist:
+            return Response({'error': f'Level with ID {level_id} not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            subject = Subject.objects.get(pk=subject_id)
+        except Subject.DoesNotExist:
+            return Response({'error': f'Subject with ID {subject_id} not found'}, status=status.HTTP_404_NOT_FOUND)
+        
         # Validate file size (max 50MB)
         if file.size > 50 * 1024 * 1024:
             return Response({'error': 'File size must be less than 50MB'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1061,9 +1103,18 @@ class QuizGenerateFromFileView(APIView):
         print(f"DEBUG: Preparing OpenAI prompt with {len(file_content)} characters of file content.")
         print(f"DEBUG: File content (first 500 chars): {file_content[:500]}...")
         
+        # Define smart instructions based on difficulty
+        difficulty_instructions = {
+            'easy': "Focus on basic facts, definitions, and simple recall. Questions should be direct and encouraging.",
+            'medium': "Focus on understanding and application. clearly test if the user grasps the core concepts. Mix straightforward questions with some that require thought.",
+            'hard': "GENERATE SUPER SMART QUESTIONS. Focus on deep analysis, critical thinking, and synthesis of multiple concepts. Avoid simple recall. Ask 'Why', 'How', and 'What if' questions. Test the user's ability to apply knowledge in complex or novel scenarios. Make distractors (wrong options) plausible and tricky."
+        }
+        instruction = difficulty_instructions.get(difficulty, difficulty_instructions['medium'])
+
         prompt = f"""Based on the following study material, generate {num_questions} multiple-choice questions.
         
-        Difficulty: {difficulty}
+        Difficulty Level: {difficulty.upper()}
+        Specific Instructions: {instruction}
         
         Study Material:
         {file_content}
@@ -1113,10 +1164,10 @@ class QuizGenerateFromFileView(APIView):
                 uploaded_file=file,
                 time_limit=num_questions * 60  # 1 minute per question
             )
-            # Assign foreign keys directly using the objects we already have
-            quiz.category = Category.objects.get(pk=category_id)
-            quiz.level = Level.objects.get(pk=level_id)
-            quiz.subject = Subject.objects.get(pk=subject_id)
+            # Assign foreign keys using validated objects
+            quiz.category = category
+            quiz.level = level
+            quiz.subject = subject
             quiz.save()
             
             for idx, q_data in enumerate(questions_data):
@@ -1143,6 +1194,22 @@ class QuizGenerateFromFileView(APIView):
                 'quiz': serializer.data
             }, status=status.HTTP_201_CREATED)
             
+        except json.JSONDecodeError as e:
+            # JSON parsing error from AI response
+            traceback.print_exc()
+            return Response({
+                'error': 'Failed to parse AI response',
+                'details': f'The AI generated invalid JSON: {str(e)}',
+                'type': 'JSONDecodeError'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except KeyError as e:
+            # Missing required field in AI response
+            traceback.print_exc()
+            return Response({
+                'error': 'Invalid question format from AI',
+                'details': f'Missing required field in AI response: {str(e)}',
+                'type': 'KeyError'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             # Print full traceback for debugging
             traceback.print_exc()
@@ -1886,6 +1953,8 @@ class UserAchievementsView(APIView):
         return Response(serializer.data)
 
 class QuizMetadataView(APIView):
+    permission_classes = [AllowAny]
+    
     def get(self, request):
         categories = Category.objects.all()
         data = []
