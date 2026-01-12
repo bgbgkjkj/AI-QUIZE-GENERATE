@@ -71,7 +71,9 @@ def generate_ai_response(prompt, max_tokens=2000):
                 )
                 return completion.choices[0].message.content
             except Exception as e:
-                print(f"Groq generation failed, falling back to Gemini. Error: {e}")
+                print(f"Groq generation failed: {e}")
+                # Re-raise to see the actual error instead of falling back to invalid OpenAI
+                raise ValueError(f"Groq API Error: {e}")
 
         gemini_key = getattr(settings, 'GEMINI_API_KEY', None)
         
@@ -87,19 +89,21 @@ def generate_ai_response(prompt, max_tokens=2000):
                 print(f"Gemini generation failed, falling back to OpenAI if available. Error: {e}")
         
         # Fallback to OpenAI
-        client = get_openai_client()
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are an expert quiz generator. You generate unique and diverse questions every time."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=1.0,
-            presence_penalty=0.5,
-            frequency_penalty=0.5,
-            max_tokens=max_tokens
-        )
-        return response.choices[0].message.content.strip()
+        # Fallback to OpenAI REMOVED
+        # client = get_openai_client()
+        # response = client.chat.completions.create(
+        #     model="gpt-3.5-turbo",
+        #     messages=[
+        #         {"role": "system", "content": "You are an expert quiz generator. You generate unique and diverse questions every time."},
+        #         {"role": "user", "content": prompt}
+        #     ],
+        #     temperature=1.0,
+        #     presence_penalty=0.5,
+        #     frequency_penalty=0.5,
+        #     max_tokens=max_tokens
+        # )
+        # return response.choices[0].message.content.strip()
+        raise ValueError("No valid AI provider available. Please check GROQ_API_KEY.")
     except Exception as e:
         print(f"CRITICAL ERROR in generate_ai_response: {e}")
         traceback.print_exc()
