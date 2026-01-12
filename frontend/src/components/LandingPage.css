@@ -689,7 +689,7 @@
 .lp-h1,
 .lp-h2,
 .lp-modalTitle {
-  color: #0f172a !important;
+  color: var(--lp-text) !important;
   opacity: 1 !important;
 }
 
@@ -702,13 +702,13 @@
 .lp-modalDesc,
 .lp-note,
 .lp-footer {
-  color: #475569 !important;
+  color: var(--lp-muted) !important;
   opacity: 1 !important;
 }
 
 /* In case global CSS targets all <p> tags */
 .lp-root p {
-  color: #475569 !important;
+  color: var(--lp-muted) !important;
   opacity: 1 !important;
 }
 
