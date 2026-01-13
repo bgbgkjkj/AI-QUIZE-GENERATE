@@ -138,7 +138,8 @@ def generate_ai_response(prompt, max_tokens=2000):
             try:
                 return _try_ollama(prompt)
             except Exception as e:
-                print(f"Ollama failed: {e}. Falling back to others if auto-fallback enabled")
+                print(f"Ollama failed: {e}")
+                if provider != 'auto': raise e
                 pass 
 
         elif provider == 'groq':
@@ -146,6 +147,7 @@ def generate_ai_response(prompt, max_tokens=2000):
                 return _try_groq(prompt, max_tokens)
             except Exception as e:
                 print(f"Groq failed: {e}")
+                if provider != 'auto': raise e
                 pass
 
         elif provider == 'gemini':
@@ -153,6 +155,7 @@ def generate_ai_response(prompt, max_tokens=2000):
                 return _try_gemini(prompt)
             except Exception as e:
                 print(f"Gemini failed: {e}")
+                if provider != 'auto': raise e
                 pass
         
         elif provider == 'openai':
@@ -160,6 +163,7 @@ def generate_ai_response(prompt, max_tokens=2000):
                 return _try_openai(prompt, max_tokens)
             except Exception as e:
                 print(f"OpenAI failed: {e}")
+                if provider != 'auto': raise e
                 pass
 
         # If explicit attempt failed or provider is 'auto', run through priority list
