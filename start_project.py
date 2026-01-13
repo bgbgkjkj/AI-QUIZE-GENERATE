@@ -133,6 +133,13 @@ def main():
     # Save changes to .env
     write_env(env_path, env_vars, original_lines)
     print(f"\nConfiguration saved to {env_path}")
+    
+    print("\nChecking and installing dependencies...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "backend/requirements.txt"])
+        print("Dependencies are up to date.")
+    except subprocess.CalledProcessError:
+        print("Warning: Failed to install dependencies. You might need to run 'pip install -r backend/requirements.txt' manually.")
 
     # Start the server
     print("\nStarting Django Server...")
