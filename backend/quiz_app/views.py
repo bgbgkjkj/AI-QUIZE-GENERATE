@@ -17,6 +17,7 @@ from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from openai import OpenAI
 from groq import Groq
+import requests
 
 from .models import (
     Category, Level, Subject, QuizConfig, Quiz, Question,
@@ -49,83 +50,122 @@ def get_openai_client():
             raise e # Re-raise other exceptions
     return _openai_client
 
+def _try_ollama(prompt):
+    """Helper to generate with Ollama"""
+    print("DEBUG: Attempting to use Local LLM (Ollama)...")
+    # import requests removed
+    response = requests.post(
+        "http://localhost:11434/api/generate",
+        json={
+            "model": "llama3", 
+            "prompt": f"System: You are an expert quiz generator. Return valid JSON only.\nUser: {prompt}",
+            "stream": False,
+            "format": "json"
+        },
+        timeout=300
+    )
+    if response.status_code == 200:
+        print("DEBUG: Ollama generation successful.")
+        return response.json().get("response", "")
+    else:
+        print(f"Ollama Error: {response.status_code} - {response.text}")
+        raise ValueError(f"Ollama API returned {response.status_code}")
+
+def _try_groq(prompt, max_tokens):
+    """Helper to generate with Groq"""
+    groq_key = getattr(settings, 'GROQ_API_KEY', None)
+    if not groq_key:
+        raise ValueError("GROQ_API_KEY not set")
+        
+    print("DEBUG: Attempting to use Groq...")
+    client = Groq(api_key=groq_key)
+    completion = client.chat.completions.create(
+        model="llama3-70b-8192", 
+        messages=[
+            {"role": "system", "content": "You are an expert quiz generator. Return valid JSON only."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7,
+        max_tokens=max_tokens,
+    )
+    print("DEBUG: Groq generation successful.")
+    return completion.choices[0].message.content
+
+def _try_gemini(prompt):
+    """Helper to generate with Gemini"""
+    gemini_key = getattr(settings, 'GEMINI_API_KEY', None)
+    if not gemini_key:
+        raise ValueError("GEMINI_API_KEY not set")
+
+    print("DEBUG: Attempting to use Gemini...")
+    import google.generativeai as genai
+    genai.configure(api_key=gemini_key)
+    model = genai.GenerativeModel('gemini-pro')
+    response = model.generate_content(prompt)
+    print("DEBUG: Gemini generation successful.")
+    return response.text
+
 def generate_ai_response(prompt, max_tokens=2000):
     """
-    Generate response using either Google Gemini or OpenAI based on available configuration.
-    Prioritizes Gemini if configured.
+    Generate response using the configured LLM provider.
     """
+    provider = getattr(settings, 'LLM_PROVIDER', 'auto').lower()
+    print(f"DEBUG: Active LLM Provider: {provider}")
+
     try:
-        # Check for Groq first (Fastest/Free-ish)
-        groq_key = getattr(settings, 'GROQ_API_KEY', None)
-        if groq_key:
+        # Strategy: Try selected provider first.
+        if provider == 'ollama':
             try:
-                client = Groq(api_key=groq_key)
-                completion = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": "You are an expert quiz generator. Return valid JSON only."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.7,
-                    max_tokens=max_tokens,
-                )
-                return completion.choices[0].message.content
+                return _try_ollama(prompt)
             except Exception as e:
-                print(f"Groq generation failed: {e}")
-                # Re-raise to see the actual error instead of falling back to invalid OpenAI
+                print(f"Ollama failed: {e}. Falling back to others if auto-fallback enabled (currently strict for testing or implicit fallbacks)")
+                # If explicit choice fails, we might want to fallback or just raise. 
+                # For user experience, let's try Groq as backup? 
+                # User asked to "run ollama OR groq". If I pick one, I expect it. 
+                # But if it's broken, fallback is good.
+                pass 
+
+        elif provider == 'groq':
+            try:
+                return _try_groq(prompt, max_tokens)
             except Exception as e:
-                print(f"Groq generation failed: {e}. Falling back to other providers...")
-                # Continue execution to try Gemini
+                print(f"Groq failed: {e}")
                 pass
 
-        gemini_key = getattr(settings, 'GEMINI_API_KEY', None)
-        
-        # If Gemini is configured, use it
-        if gemini_key:
+        elif provider == 'gemini':
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=gemini_key)
-                model = genai.GenerativeModel('gemini-pro')
-                response = model.generate_content(prompt)
-                return response.text
+                return _try_gemini(prompt)
             except Exception as e:
-                print(f"Gemini generation failed: {e}. Falling back to Local LLM...")
+                print(f"Gemini failed: {e}")
                 pass
+
+        # If explicit attempt failed or provider is 'auto', run through priority list
+        print("DEBUG: Entering fallback/auto mode...")
         
-        # 3. Fallback to Local LLM (Ollama)
-        # This allows UNLIMITED free generation if the user has Ollama installed
+        # 1. Ollama
         try:
-            print("DEBUG: Attempting to use Local LLM (Ollama)...")
-            import requests
-            
-            # Ollama API endpoint (standard port 11434)
-            # using 'llama3' as default, but falling back to 'mistral' or others is possible if we check functionality
-            response = requests.post(
-                "http://localhost:11434/api/generate",
-                json={
-                    "model": "llama3", 
-                    "prompt": f"System: You are an expert quiz generator. Return valid JSON only.\nUser: {prompt}",
-                    "stream": False,
-                    "format": "json" # Force JSON mode if model supports it
-                },
-                timeout=300 # Increase timeout to 5 mins for slow PCs
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return result.get("response", "")
-            else:
-                print(f"Ollama Error: {response.status_code} - {response.text}")
-                
-        except Exception as e:
-            print(f"Local LLM (Ollama) failed: {e}")
+             return _try_ollama(prompt)
+        except Exception:
+             pass
+        
+        # 2. Groq
+        try:
+            return _try_groq(prompt, max_tokens)
+        except Exception:
             pass
 
-        raise ValueError("No valid AI provider available. Please check GROQ_API_KEY, GEMINI_API_KEY, or ensure Ollama is running.")
+        # 3. Gemini
+        try:
+            return _try_gemini(prompt)
+        except Exception:
+            pass
+
+        raise ValueError("No valid AI provider available. Please configure Ollama, Groq, or Gemini.")
+    
     except Exception as e:
         print(f"CRITICAL ERROR in generate_ai_response: {e}")
         traceback.print_exc()
-        raise ValueError(f"Failed to get response from AI service: {e}")
+        raise ValueError(f"Failed to get response from any AI service: {e}")
 
 
 def extract_text_from_file(file):
@@ -905,76 +945,61 @@ class QuizGenerateView(APIView):
 
         all_questions_data = []
         last_error = None
-        num_topics = len(topic_list)
-        questions_per_topic = num_questions // num_topics
-        extra_questions = num_questions % num_topics
+        
+        # Consolidate topics into a single list for the prompt
+        topics_str = ", ".join(topic_list)
 
-        for i, topic in enumerate(topic_list):
-            num_to_generate = questions_per_topic + (1 if i < extra_questions else 0)
-            if num_to_generate == 0:
-                continue
+        prompt = f"""Generate {num_questions} UNIQUE, DIVERSE, and NON-REPETITIVE multiple-choice questions for a quiz covering the following topics: '{topics_str}' 
+        (Subject: {subject.name}, Category: {category.name}, Level: {level.name}).
 
-            retries = 3
-            while retries > 0:
-                try:
-                    prompt = f"""Generate {num_to_generate} UNIQUE, DIVERSE, and NON-REPETITIVE multiple-choice questions for a quiz on the topic '{topic}' 
-                    (Subject: {subject.name}, Category: {category.name}, Level: {level.name}).
+        Difficulty: {difficulty}
+        Standard: CBSE (India) curriculum
+        Random Seed: {random.randint(1, 100000)} (Use this to vary questions from previous requests)
 
-                    Difficulty: {difficulty}
-                    Standard: CBSE (India) curriculum
-                    Random Seed: {random.randint(1, 100000)} (Use this to vary questions from previous requests)
+        Return ONLY a valid JSON array with this exact structure:
+        [
+            {{
+                "question": "Question text here?",
+                "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+                "correct_answer": 0,
+                "explanation": "Explanation of the correct answer"
+            }}
+        ]
 
-                    Return ONLY a valid JSON array with this exact structure:
-                    [
-                        {{
-                            "question": "Question text here?",
-                            "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-                            "correct_answer": 0,
-                            "explanation": "Explanation of the correct answer"
-                        }}
-                    ]
+        Important:
+        - Each question must have exactly 4 options
+        - correct_answer must be the index (0-3) of the correct option
+        - Make questions relevant to {difficulty} difficulty level
+        - Provide clear explanations
+        - Do NOT repeat questions from the same session.
+        - Distribute the questions evenly across the topics: {topics_str}.
+        """
+        
+        try:
+            # Increased max_tokens for a single large request
+            max_tokens_per_question = 350 
+            max_tokens = min(num_questions * max_tokens_per_question, 8000)
 
-                    Important:
-                    - Each question must have exactly 4 options
-                    - correct_answer must be the index (0-3) of the correct option
-                    - Make questions relevant to {difficulty} difficulty level
-                    - Provide clear explanations
-                    - Do NOT repeat questions
-                    """
-                    
-                    max_tokens_per_question = 300 # Estimated tokens per question including options and explanation
-                    calculated_max_tokens = num_to_generate * max_tokens_per_question
-                    max_tokens = min(calculated_max_tokens, 8000) # Increased max_tokens limit
+            ai_content = generate_ai_response(prompt, max_tokens=max_tokens)
+            
+            # Clean up the response
+            if '```json' in ai_content:
+                ai_content = ai_content.split('```json')[1].split('```')[0]
+            elif ai_content.startswith('```'):
+                ai_content = ai_content.split('```')[1]
+            
+            start_index = ai_content.find('[')
+            end_index = ai_content.rfind(']')
 
+            if start_index != -1 and end_index != -1:
+                ai_content = ai_content[start_index:end_index+1]
+            
+            all_questions_data = json.loads(ai_content)
 
-                    ai_content = generate_ai_response(prompt, max_tokens=max_tokens)
-                    
-                    if '```json' in ai_content:
-                        ai_content = ai_content.split('```json')[1]
-                        ai_content = ai_content.split('```')[0]
-                    elif ai_content.startswith('```'):
-                        ai_content = ai_content.split('```')[1]
-                    
-                    start_index = ai_content.find('[')
-                    end_index = ai_content.rfind(']')
-
-                    if start_index != -1 and end_index != -1:
-                        ai_content = ai_content[start_index:end_index+1]
-                    
-                    questions_data = json.loads(ai_content)
-                    all_questions_data.extend(questions_data)
-                    last_error = None # Reset error on success
-                    break 
-
-                except Exception as e:
-                    last_error = e
-                    retries -= 1
-                    print(f"DEBUG: Exception in quiz generation for topic '{topic}': {e}. Retries left: {retries}")
-                    if retries == 0:
-                        print(f"Failed to generate questions for topic '{topic}' after multiple retries.")
-                        # Optionally, you could add a placeholder or skip this topic.
-                        # For now, we just log and continue.
-                        pass
+        except Exception as e:
+            last_error = e
+            print(f"DEBUG: Exception in single-shot quiz generation: {e}")
+            traceback.print_exc()
 
         # If no questions generated, return an error
         if not all_questions_data:

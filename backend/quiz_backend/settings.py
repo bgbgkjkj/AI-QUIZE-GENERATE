@@ -111,6 +111,9 @@ if not GEMINI_API_KEY and not OPENAI_API_KEY:
 # Groq API Key
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
+# LLM Provider Configuration (ollama, groq, gemini, auto)
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'auto')
+
 # REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
