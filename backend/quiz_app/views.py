@@ -105,6 +105,26 @@ def _try_gemini(prompt):
     print("DEBUG: Gemini generation successful.")
     return response.text
 
+def _try_openai(prompt, max_tokens):
+    """Helper to generate with OpenAI"""
+    openai_key = getattr(settings, 'OPENAI_API_KEY', None)
+    if not openai_key:
+        raise ValueError("OPENAI_API_KEY not set")
+
+    print("DEBUG: Attempting to use OpenAI...")
+    client = OpenAI(api_key=openai_key)
+    completion = client.chat.completions.create(
+        model="gpt-3.5-turbo", 
+        messages=[
+            {"role": "system", "content": "You are an expert quiz generator. Return valid JSON only."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.7,
+        max_tokens=max_tokens,
+    )
+    print("DEBUG: OpenAI generation successful.")
+    return completion.choices[0].message.content
+
 def generate_ai_response(prompt, max_tokens=2000):
     """
     Generate response using the configured LLM provider.
@@ -118,11 +138,7 @@ def generate_ai_response(prompt, max_tokens=2000):
             try:
                 return _try_ollama(prompt)
             except Exception as e:
-                print(f"Ollama failed: {e}. Falling back to others if auto-fallback enabled (currently strict for testing or implicit fallbacks)")
-                # If explicit choice fails, we might want to fallback or just raise. 
-                # For user experience, let's try Groq as backup? 
-                # User asked to "run ollama OR groq". If I pick one, I expect it. 
-                # But if it's broken, fallback is good.
+                print(f"Ollama failed: {e}. Falling back to others if auto-fallback enabled")
                 pass 
 
         elif provider == 'groq':
@@ -137,6 +153,13 @@ def generate_ai_response(prompt, max_tokens=2000):
                 return _try_gemini(prompt)
             except Exception as e:
                 print(f"Gemini failed: {e}")
+                pass
+        
+        elif provider == 'openai':
+            try:
+                return _try_openai(prompt, max_tokens)
+            except Exception as e:
+                print(f"OpenAI failed: {e}")
                 pass
 
         # If explicit attempt failed or provider is 'auto', run through priority list
@@ -159,8 +182,14 @@ def generate_ai_response(prompt, max_tokens=2000):
             return _try_gemini(prompt)
         except Exception:
             pass
+        
+        # 4. OpenAI
+        try:
+            return _try_openai(prompt, max_tokens)
+        except Exception:
+            pass
 
-        raise ValueError("No valid AI provider available. Please configure Ollama, Groq, or Gemini.")
+        raise ValueError("No valid AI provider available. Please configure Ollama, Groq, Gemini, or OpenAI.")
     
     except Exception as e:
         print(f"CRITICAL ERROR in generate_ai_response: {e}")

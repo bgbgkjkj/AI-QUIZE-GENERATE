@@ -71,17 +71,25 @@ def main():
     ensure_env_exists(env_path, example_env_path)
     env_vars, original_lines = read_env(env_path)
 
-    print("\nSelect AI Provider:")
+    print("Select AI Provider:")
     print("1. Ollama (Local - Free, Private)")
     print("2. Groq (Cloud - Fast, Requires API Key)")
+    print("3. Gemini (Google - High Quality, Requires API Key)")
+    print("4. OpenAI (ChatGPT - Premium, Requires API Key)")
     
     while True:
-        choice = input("\nEnter your choice (1/2) [default: 1]: ").strip()
+        choice = input("\nEnter your choice (1/2/3/4) [default: 1]: ").strip()
         if choice == '' or choice == '1':
             provider = 'ollama'
             break
         elif choice == '2':
             provider = 'groq'
+            break
+        elif choice == '3':
+            provider = 'gemini'
+            break
+        elif choice == '4':
+            provider = 'openai'
             break
         else:
             print("Invalid choice. Please try again.")
@@ -89,33 +97,38 @@ def main():
     env_vars['LLM_PROVIDER'] = provider
     print(f"\nSelected Provider: {provider.upper()}")
 
-    if provider == 'groq':
-        current_key = env_vars.get('GROQ_API_KEY', '')
-        # Mask key for display
+    def check_update_key(provider_name, env_key):
+        current_key = env_vars.get(env_key, '')
         masked_key = (current_key[:4] + '*' * (len(current_key) - 8) + current_key[-4:]) if len(current_key) > 8 else "Not Set/Invalid"
+        print(f"\nCurrent {provider_name} API Key: {masked_key}")
         
-        print(f"\nCurrent Groq API Key: {masked_key}")
-        
-        if not current_key or current_key == 'your-groq-api-key':
+        need_input = False
+        if not current_key or 'your-' in current_key.lower():
             print("Key is missing or default placeholder.")
             need_input = True
         else:
-            change = input("Do you want to change the API key? (y/N): ").strip().lower()
-            need_input = (change == 'y' or change == 'yes')
-            
+             change = input("Do you want to change the API key? (y/N): ").strip().lower()
+             need_input = (change == 'y' or change == 'yes')
+        
         if need_input:
             while True:
-                new_key = input("Please enter your Groq API Key: ").strip()
+                new_key = input(f"Please enter your {provider_name} API Key: ").strip()
                 if new_key:
-                    env_vars['GROQ_API_KEY'] = new_key
+                    env_vars[env_key] = new_key
                     break
                 else:
-                    # If they just pressed enter but we required input (because it was missing)
-                    if not current_key or current_key == 'your-groq-api-key':
-                        print("API Key cannot be empty.")
+                    if not current_key or 'your-' in current_key.lower():
+                         print("API Key cannot be empty.")
                     else:
-                        print("Keeping existing key.")
-                        break
+                         print("Keeping existing key.")
+                         break
+
+    if provider == 'groq':
+        check_update_key("Groq", "GROQ_API_KEY")
+    elif provider == 'gemini':
+        check_update_key("Gemini", "GEMINI_API_KEY")
+    elif provider == 'openai':
+        check_update_key("OpenAI", "OPENAI_API_KEY")
 
     # Save changes to .env
     write_env(env_path, env_vars, original_lines)
