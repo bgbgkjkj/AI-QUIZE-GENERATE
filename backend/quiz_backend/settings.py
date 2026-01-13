@@ -4,8 +4,8 @@ from dotenv import load_dotenv
 # Load environment variables
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Load environment variables
-load_dotenv(os.path.join(BASE_DIR, '.env'))
+# Load environment variables with override=True to ensure file values take precedence
+load_dotenv(os.path.join(BASE_DIR, '.env'), override=True)
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-change-this')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'

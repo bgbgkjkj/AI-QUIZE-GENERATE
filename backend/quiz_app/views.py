@@ -80,7 +80,7 @@ def _try_groq(prompt, max_tokens):
     print("DEBUG: Attempting to use Groq...")
     client = Groq(api_key=groq_key)
     completion = client.chat.completions.create(
-        model="llama3-70b-8192", 
+        model="llama-3.3-70b-versatile", 
         messages=[
             {"role": "system", "content": "You are an expert quiz generator. Return valid JSON only."},
             {"role": "user", "content": prompt}
@@ -144,6 +144,7 @@ def generate_ai_response(prompt, max_tokens=2000):
 
         elif provider == 'groq':
             try:
+                # Updated to Llama 3.3 70B (Versatile) as Llama 3 70B is decommissioned
                 return _try_groq(prompt, max_tokens)
             except Exception as e:
                 print(f"Groq failed: {e}")
