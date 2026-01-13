@@ -62,7 +62,7 @@ def _try_ollama(prompt):
             "stream": False,
             "format": "json"
         },
-        timeout=300
+        timeout=900
     )
     if response.status_code == 200:
         print("DEBUG: Ollama generation successful.")
