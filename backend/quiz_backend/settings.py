@@ -2,9 +2,10 @@ import os
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv()
-
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Load environment variables
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-change-this')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
@@ -97,10 +98,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # OpenAI API Key - MUST be set in environment variable or .env file
 # OpenAI API Key - Force disabled to prevent system env var usage
-OPENAI_API_KEY = None
+# OpenAI API Key
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 if not OPENAI_API_KEY:
-    # import warnings
-    # warnings.warn("OPENAI_API_KEY environment variable is not set. AI quiz generation will not work.")
     pass
 
 # Google Gemini API Key
