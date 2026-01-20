@@ -71,6 +71,22 @@ if %errorlevel% neq 0 (
     echo [OK] Core libraries verified.
 )
 
+
+REM Setup Database
+echo [ACTION] Applying database migrations...
+.\.venv\Scripts\python backend\manage.py migrate
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to apply database migrations.
+    pause
+    exit /b 1
+)
+
+echo [ACTION] Seeding initial data...
+.\.venv\Scripts\python backend\manage.py seed_categories
+if %errorlevel% neq 0 (
+    echo [WARNING] Failed to seed categories. usage might be affected.
+)
+
 REM Start Project
 echo.
 echo [INFO] Setup complete. Starting the application...
