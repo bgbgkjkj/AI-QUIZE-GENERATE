@@ -10,6 +10,7 @@ python --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Python is not installed or not in your PATH.
     echo Please install Python 3.11 or higher from python.org.
+    echo Make sure to check "Add Python to PATH" during installation.
     pause
     exit /b 1
 )
@@ -19,10 +20,10 @@ echo.
 
 REM Clean existing venv
 if exist ".venv" (
-    echo [ACTION] removing existing .venv directory...
+    echo [ACTION] Removing existing .venv directory to ensure clean slate...
     rmdir /s /q ".venv"
     if exist ".venv" (
-        echo [ERROR] Failed to remove .venv. Please close any open terminals or files in .venv and try again.
+        echo [ERROR] Failed to remove .venv. Please close any open terminals (VS Code, CMD, PowerShell) and try again.
         pause
         exit /b 1
     )
@@ -39,16 +40,36 @@ if %errorlevel% neq 0 (
 )
 echo [OK] Virtual environment created.
 
-REM Install dependencies
-echo [ACTION] Installing dependencies from backend/requirements.txt...
+REM Install dependencies with NO CACHE to avoid corruption
+echo [ACTION] Installing dependencies...
+echo [INFO] Using --no-cache-dir to prevent corrupted package installs.
 .\.venv\Scripts\python -m pip install --upgrade pip
-.\.venv\Scripts\python -m pip install -r backend\requirements.txt
+.\.venv\Scripts\python -m pip install --no-cache-dir -r backend\requirements.txt
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to install dependencies.
     pause
     exit /b 1
 )
-echo [OK] Dependencies installed successfully.
+echo [OK] Dependencies installed.
+
+REM Verify Pydantic installation (Common failure point)
+echo [ACTION] Verifying core libraries...
+.\.venv\Scripts\python -c "import pydantic_core; print('Pydantic Core OK')" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [WARNING] Pydantic Core check failed. Attempting auto-repair...
+    .\.venv\Scripts\python -m pip install --force-reinstall pydantic pydantic_core
+    
+    REM Check again
+    .\.venv\Scripts\python -c "import pydantic_core" >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo [ERROR] Auto-repair failed. Your system might have a library conflict.
+        pause
+        exit /b 1
+    )
+    echo [OK] Auto-repair successful.
+) else (
+    echo [OK] Core libraries verified.
+)
 
 REM Start Project
 echo.
