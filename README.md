@@ -58,7 +58,14 @@ git clone <repository-url>
 cd Quiz-Management-System-with-Auto-Generated-Questions
 ```
 
-#### 2️⃣ Backend Setup
+#### 2️⃣ Automatic Setup (Windows) - RECOMMENDED
+Just double-click `setup_project.bat`! 
+This will automatically:
+- Create a fresh virtual environment
+- Install all dependencies
+- Start the server
+
+#### 3️⃣ Manual Backend Setup (If above fails)
 ```bash
 # Navigate to backend
 cd backend
